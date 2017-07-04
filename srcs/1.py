@@ -45,5 +45,9 @@ if __name__ == '__main__':
     data_21, norm_21, fail_21 = get_data(21)
     add_label(data_15, norm_15, fail_15)
     add_label(data_21, norm_21, fail_21)
-    data_15['label'].value_counts(dropna=False)
-    data_21['label'].value_counts(dropna=False)
+    data_15["label"].value_counts(dropna=False)
+    data_21["label"].value_counts(dropna=False)
+
+    # data_15["label"] = data_15["label"].fillna(-1)
+    # plt.plot(data_15['time'], data_15['label'])
+    # plt.show()
