@@ -22,24 +22,28 @@ def run_time(func):
 @run_time
 def get_data(num):
     num = str(num)
-    data_feat = pd.read_csv(train_path + '\\' + num + '\\' + num + '_data.csv', parse_dates=["time"])
-    data_norm = pd.read_csv(train_path + '\\' + num + '\\' + num + '_normalInfo.csv', parse_dates=["startTime", "endTime"])
-    data_fail = pd.read_csv(train_path + '\\' + num + '\\' + num + '_failureInfo.csv', parse_dates=["startTime", "endTime"])
+    data_feat = pd.read_csv('%s\\%s\\%s_data.csv' % (train_path, num, num), parse_dates=["time"])
+    data_norm = pd.read_csv('%s\\%s\\%s_normalInfo.csv' % (train_path, num, num), parse_dates=["startTime", "endTime"])
+    data_fail = pd.read_csv('%s\\%s\\%s_failureInfo.csv' % (train_path, num, num), parse_dates=["startTime", "endTime"])
     return data_feat, data_norm, data_fail
 
 
-def add_label(x, data_norm, data_fail):
-    for i in range(data_fail.shape[0]):
-        if data_fail['startTime'][i] <= x <= data_fail['endTime'][i]:
-            return 1
-        elif data_norm['startTime'][i] <= x <= data_norm['endTime'][i]:
-            return 0
-        else:
-            return np.NaN
-
+def add_label(data_feat, data_norm, data_fail):
+    data_feat["label"] = np.NaN
+    norm_len = data_norm.shape[0]
+    fail_len = data_fail.shape[0]
+    for i in range(norm_len):
+        data_feat.loc[(data_norm['startTime'][i] <= data_feat["time"]) &
+                      (data_feat["time"] <= data_norm['endTime'][i]), "label"] = 0
+    for j in range(fail_len):
+        data_feat.loc[(data_fail['startTime'][j] <= data_feat["time"]) &
+                      (data_feat["time"] <= data_fail['endTime'][j]), "label"] = 1
 
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
     data_21, norm_21, fail_21 = get_data(21)
-    # data_15["label"] = data_15["time"].map(lambda x: add_label(x, norm_15, fail_15))
+    add_label(data_15, norm_15, fail_15)
+    add_label(data_21, norm_21, fail_21)
+    data_15['label'].value_counts(dropna=False)
+    data_21['label'].value_counts(dropna=False)
 
