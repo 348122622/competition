@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 
-train_path = '..\\data\\train'
+train_path = '..\\data1\\train'
 
 
 def run_time(func):
@@ -39,6 +39,7 @@ def add_label(data_feat, data_norm, data_fail):
         data_feat.loc[(data_fail['startTime'][j] <= data_feat["time"]) &
                       (data_feat["time"] <= data_fail['endTime'][j]), "label"] = 1
 
+
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
     data_21, norm_21, fail_21 = get_data(21)
@@ -46,4 +47,3 @@ if __name__ == '__main__':
     add_label(data_21, norm_21, fail_21)
     data_15['label'].value_counts(dropna=False)
     data_21['label'].value_counts(dropna=False)
-
