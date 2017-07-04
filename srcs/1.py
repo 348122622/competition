@@ -20,4 +20,4 @@ def get_label(x):
         else:
             return np.NaN
 
-
+data_15["label"] = data_15["time"].map(lambda x: get_label(x))
