@@ -15,6 +15,7 @@ import pickle
 train_path = '..\\data1\\train'
 test_path = '..\\data1\\test\\08\\08_data.csv'
 
+
 # 计时器
 def run_time(func):
     def wrapper(num):
@@ -133,7 +134,7 @@ if __name__ == '__main__':
     # plt.yticks(rotation=0)
     
     # 1:1欠采样
-    X15, y15 = get_train(data15)
+    # X15, y15 = get_train(data15)
     # X21, y21 = get_train(data21)
     # X_train, X_test, y_train, y_test = train_test_split(X15, y15, test_size=0.3, random_state=1)
     # y_train:    0.0    16747      y_test:     0.0    7145
