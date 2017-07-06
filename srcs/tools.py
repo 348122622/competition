@@ -4,7 +4,6 @@ import itertools
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.cross_validation import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.cross_validation import KFold, cross_val_score
 from sklearn.metrics import accuracy_score,confusion_matrix,precision_recall_curve,auc,roc_auc_score,roc_curve,recall_score,classification_report

@@ -1,12 +1,12 @@
 # coding=utf-8
+import srcs.tools as tools
 import time
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-import srcs.tools as tools
+from sklearn.metrics import confusion_matrix
 from sklearn.grid_search import GridSearchCV
-from sklearn import cross_validation, metrics
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
@@ -71,14 +71,14 @@ def get_train(data, rate=1):
 
 # 获取8号风机测试集
 def get_test():
-    data = pd.read_csv(test_path)
-    test = data.iloc[:, 1:]
+    test = pd.read_csv(test_path, index_col="time")
     return test
 
 
 # 生成结果
 def output(y_p):
-    y_p = pd.Series(y_p)
+    # 测试集中的time = index + 1, 重置结果索引
+    y_p = pd.Series(y_p, index=[x for x in range(1, len(y_p)+1)])
     fail_index = np.array(y_p[y_p == 1].index)
     n = len(fail_index)
     ans = []
@@ -91,6 +91,17 @@ def output(y_p):
     result = pd.DataFrame(ans, columns=["startTime", "endTime"])
     return result
     # result.to_csv('test1_08_results.csv', index=False)
+
+
+# 获取评分
+def get_score(y, y_p):
+    cnf = confusion_matrix(y, y_p)
+    p = len(y[y == 0])
+    n = len(y[y == 1])
+    fn = cnf[0][1]
+    fp = cnf[1][0]
+    score = 1 - fn * 0.5 / float(p) - fp * 0.5 / float(n)
+    return score
 
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
