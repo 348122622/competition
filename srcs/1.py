@@ -4,6 +4,7 @@ import time
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import xgboost as xgb
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score
 from sklearn import cross_validation
@@ -92,7 +93,7 @@ def output(y_p):
             cur = i
     result = pd.DataFrame(ans, columns=["startTime", "endTime"])
     return result
-    # result.to_csv('test1_08_results.csv', index=False)
+    # result.to_csv('..\\upload\\test1_08_results.csv', index=False)
 
 
 # 获取评分
@@ -104,6 +105,14 @@ def get_score(y, y_p):
     fp = cnf[1][0]
     score = 1 - fn * 0.5 / float(p) - fp * 0.5 / float(n)
     return score
+
+
+def model(clf, X, y):
+    clf.fit(X, y)
+    y_p = clf.predict(X)
+    tools.plot_cm(y, y_p)
+    print(get_score(y, y_p))
+    return y_p
 
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
@@ -151,32 +160,37 @@ if __name__ == '__main__':
     X21 = data21.iloc[:, 1: -1]
     y21 = data21["label"]
 
-    # rf0: 训练15号的数据生成的模型
-    rf0 = RandomForestClassifier(n_estimators=100, random_state=1, n_jobs=-1)
-    rf0.fit(X15, y15)
-    y21_p = rf0.predict(X21)
-    tools.plot_cm(y21, y21_p)
-    # rf1: 训练21号的数据生成的模型
-    rf1 = RandomForestClassifier(random_state=1, n_jobs=-1)
-    rf1.fit(X21, y21)
-    y15_p = rf1.predict(X15)
-    tools.plot_cm(y15, y15_p)
-
-    gbm0 = GradientBoostingClassifier(random_state=10)
-    gbm0.fit(X15, y15)
-    y_pred = gbm0.predict(X21)
-    y_predprob = gbm0.predict_proba(X21)[:, 1]
-    print("Accuracy : %.4g" % accuracy_score(y21.values, y_pred))
-    print("AUC Score (Train): %f" % roc_auc_score(y21, y_predprob))
-    tools.plot_cm(y21, y_pred)
-
-    param_test1 = {'n_estimators': range(20, 81, 10)}
-    gsearch1 = GridSearchCV(estimator=GradientBoostingClassifier(learning_rate=0.1, min_samples_split=300,
-                                                                 min_samples_leaf=20, max_depth=8, max_features='sqrt',
-                                                                 subsample=0.8, random_state=10),
-                            param_grid=param_test1, scoring='roc_auc', iid=False, cv=5)
-    gsearch1.fit(X15, y15)
-    print(gsearch1.grid_scores_, gsearch1.best_params_, gsearch1.best_score_)
+    # # rf0: 训练15号的数据生成的模型
+    # rf0 = RandomForestClassifier(n_estimators=100, random_state=1, n_jobs=-1)
+    # rf0.fit(X15, y15)
+    # y21_p = rf0.predict(X21)
+    # tools.plot_cm(y21, y21_p)
+    # # rf1: 训练21号的数据生成的模型
+    # rf1 = RandomForestClassifier(random_state=1, n_jobs=-1)
+    # rf1.fit(X21, y21)
+    # y15_p = rf1.predict(X15)
+    # tools.plot_cm(y15, y15_p)
+    #
+    # gbm0 = GradientBoostingClassifier(random_state=10)
+    # gbm0.fit(X15, y15)
+    # y_pred = gbm0.predict(X21)
+    # y_predprob = gbm0.predict_proba(X21)[:, 1]
+    # print("Accuracy : %.4g" % accuracy_score(y21.values, y_pred))
+    # print("AUC Score (Train): %f" % roc_auc_score(y21, y_predprob))
+    # tools.plot_cm(y21, y_pred)
+    #
+    # param_test1 = {'n_estimators': range(20, 81, 10)}
+    # gsearch1 = GridSearchCV(estimator=GradientBoostingClassifier(learning_rate=0.1, min_samples_split=300,
+    #                         min_samples_leaf=20, max_depth=8, max_features='sqrt', subsample=0.8, random_state=10),
+    #                         param_grid=param_test1, scoring='roc_auc', iid=False, cv=5)
+    # gsearch1.fit(X15, y15)
+    # print(gsearch1.grid_scores_, gsearch1.best_params_, gsearch1.best_score_)
 
     # 合并15，21数据
     data = pd.concat([data15, data21])
+    X = data.iloc[:, 1: -1]
+    y = data["label"]
+
+    clf0 = RandomForestClassifier(random_state=1)
+    clf1 = GradientBoostingClassifier(random_state=1)
+    clf2 = xgb.XGBClassifier()
