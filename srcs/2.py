@@ -4,6 +4,9 @@ import time
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score
 import matplotlib.pyplot as plt
@@ -47,6 +50,46 @@ def add_label(data_feat, data_fail):
     return data_feat.fillna(0)
 
 
+# train, test分割
+def data_prep(data, size=0.3):
+    if len(data.columns) == 29:  # 过采样数据集已经消去了时间列
+        X = data.iloc[:, 1: -1]
+    else:
+        X = data.iloc[:, : -1]
+    y = data["label"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=size, random_state=10)
+    print("训练集大小：%d" % len(X_train))
+    print("测试集大小：%d" % len(X_test))
+    return X_train, X_test, y_train, y_test
+
+
+# 构造过采样训练集
+def oversample1(data):
+    data_fail = data[data["label"] == 1]
+    times = int(len(data) / len(data_fail)) - 1
+    for i in range(times):
+        data = data.append(data_fail)
+    print("过采样正常样本大小：%d" % len(data[data["label"] == 0]))
+    print("过采样结冰样本大小：%d" % len(data[data["label"] == 1]))
+    return data
+
+
+# 过采样，多种可选方式
+def oversample(data, model):
+    # model = SMOTE(random_state=0, n_jobs=-1)
+    # model = ADASYN(random_state=0, n_jobs=-1)
+    # model = RandomOverSampler(random_state=0)
+    columns = data.columns[1: -1]
+    X, y = model.fit_sample(data.iloc[:, 1: -1], data["label"])
+    X = pd.DataFrame(X, columns=columns)
+    y = pd.DataFrame(y, columns=["label"])
+    print("smote采样总样本大小：%d" % len(y))
+    print("smote采样正常样本大小：%d" % len(y[y["label"] == 0]))
+    print("smote采样结冰样本大小：%d" % len(y[y["label"] == 1]))
+    # 注意，返回的数据集已经去掉了时间列
+    return pd.concat([X, y], axis=1)
+
+
 def output(y_p, num):
     # 测试集中的time = index + 1, 重置结果索引
     y_p = pd.Series(y_p, index=[x for x in range(1, len(y_p)+1)])
@@ -69,10 +112,10 @@ def output(y_p, num):
     return result
 
 
-def model(clf, train_X, train_y, test26, test33):
-    clf.fit(train_X, train_y)
-    y_p = clf.predict(train_X)
-    tools.plot_cm(train_y, y_p)
+def model(clf, X_train, y_train, test26, test33):
+    clf.fit(X_train, y_train)
+    y_p = clf.predict(X_train)
+    tools.plot_cm(y_train, y_p)
     return clf.predict(test26), clf.predict(test33)
 
 
@@ -123,3 +166,14 @@ if __name__ == '__main__':
     clf0 = RandomForestClassifier(random_state=1)
     clf1 = GradientBoostingClassifier(random_state=1)
     clf2 = xgb.XGBClassifier()
+
+    X_train, X_test, y_train, y_test = data_prep(over)
+    clf1.fit(X_train, y_train)
+    y_p = clf1.predict(X_train)
+    tools.plot_cm(y_train, y_p)
+    y_p = clf1.predict(X_test)
+    tools.plot_cm(y_test, y_p)
+    y_p1 = clf1.predict(test26)
+    y_p2 = clf1.predict(test33)
+    output(y_p1, 26)
+    output(y_p2, 33)

@@ -3,8 +3,10 @@ import srcs.tools as tools
 import time
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
 import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score
 from sklearn import cross_validation
@@ -53,23 +55,62 @@ def add_label(data_feat, data_norm, data_fail):
     return data_feat.dropna().reset_index(drop=True)
 
 
+# train, test分割
+def data_prep(data, size=0.3):
+    if len(data.columns) == 29:  # 过采样数据集已经消去了时间列
+        X = data.iloc[:, 1: -1]
+    else:
+        X = data.iloc[:, : -1]
+    y = data["label"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=size, random_state=10)
+    print("训练集大小：%d" % len(X_train))
+    print("测试集大小：%d" % len(X_test))
+    return X_train, X_test, y_train, y_test
+
+
 # 构造欠采样训练集
-def get_train(data, rate=1):
+def undersample(data, times=1):
     # 获取正负样本索引
     fail_index = np.array(data[data["label"] == 1].index)
     fail_num = len(fail_index)
     norm_index = np.array(data[data["label"] == 0].index)
     # 默认1：1欠采样， rate设定欠采样比率
     np.random.seed(1)
-    sample_norm_index = np.random.choice(norm_index, rate * fail_num, replace=False)
-    # sample_norm_index = np.array(sample_norm_index)
-    sample_index = np.hstack((sample_norm_index, fail_index))
-    sample_index.sort()
-    sample_data = data.iloc[sample_index, :]
+    undersample_norm_index = np.random.choice(norm_index, times * fail_num, replace=False)
+    # undersample_norm_index = np.array(undersample_norm_index)
+    undersample_index = np.hstack((undersample_norm_index, fail_index))
+    undersample_index.sort()
+    undersample_data = data.iloc[undersample_index, :]
+    print("欠采样正常样本大小：%d" % len(undersample_norm_index))
+    print("欠采样结冰样本大小：%d" % len(fail_index))
+    return undersample_data
 
-    X = sample_data.iloc[:, 1:]
-    y = sample_data.iloc[:, -1]
-    return X, y
+
+# # 构造过采样训练集
+# def oversample(data):
+#     data_fail = data[data["label"] == 1]
+#     times = int(len(data) / len(data_fail)) - 1
+#     for i in range(times):
+#         data = data.append(data_fail)
+#     print("过采样正常样本大小：%d" % len(data[data["label"] == 0]))
+#     print("过采样结冰样本大小：%d" % len(data[data["label"] == 1]))
+#     return data
+
+
+# 过采样，多种可选方式
+def oversample(data, model):
+    # model = SMOTE(random_state=0, n_jobs=-1)
+    # model = ADASYN(random_state=0, n_jobs=-1)
+    # model = RandomOverSampler(random_state=0)
+    columns = data.columns[1: -1]
+    X, y = model.fit_sample(data.iloc[:, 1: -1], data["label"])
+    X = pd.DataFrame(X, columns=columns)
+    y = pd.DataFrame(y, columns=["label"])
+    print("smote采样总样本大小：%d" % len(y))
+    print("smote采样正常样本大小：%d" % len(y[y["label"] == 0]))
+    print("smote采样结冰样本大小：%d" % len(y[y["label"] == 1]))
+    # 注意，返回的数据集已经去掉了时间列
+    return pd.concat([X, y], axis=1)
 
 
 # 获取8号风机测试集
@@ -92,8 +133,8 @@ def output(y_p):
                 ans.append([fail_index[cur], fail_index[i-1]])
             cur = i
     result = pd.DataFrame(ans, columns=["startTime", "endTime"])
+    result.to_csv('..\\upload\\test1_08_results.csv', index=False)
     return result
-    # result.to_csv('..\\upload\\test1_08_results.csv', index=False)
 
 
 # 获取评分
@@ -114,11 +155,24 @@ def model(clf, X, y):
     print(get_score(y, y_p))
     return y_p
 
+
+def results(over):
+    X_train, X_test, y_train, y_test = data_prep(over)
+    clf1.fit(X_train, y_train)
+    y_p = clf1.predict(X_train)
+    tools.plot_cm(y_train, y_p)
+    y_p = clf1.predict(X_test)
+    tools.plot_cm(y_test, y_p)
+    y_p = clf1.predict(test)
+    output(y_p)
+    return y_p
+
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
     data_21, norm_21, fail_21 = get_data(21)
     data15 = add_label(data_15, norm_15, fail_15)
     data21 = add_label(data_21, norm_21, fail_21)
+    test = get_test()
     # 查看正负样本数目-->非平衡数据集
     # 15号风机label：
     # 0.0: 350255
@@ -194,3 +248,4 @@ if __name__ == '__main__':
     clf0 = RandomForestClassifier(random_state=1)
     clf1 = GradientBoostingClassifier(random_state=1)
     clf2 = xgb.XGBClassifier()
+    clf3 = LogisticRegression()
