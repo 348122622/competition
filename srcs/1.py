@@ -5,15 +5,16 @@ import numpy as np
 import pandas as pd
 from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
+from xgboost.sklearn import XGBClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score
-from sklearn import cross_validation
-from sklearn.grid_search import GridSearchCV
+from sklearn import metrics, cross_validation
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
+from matplotlib.pylab import rcParams
+rcParams['figure.figsize'] = 12, 4
 
 train_path = '..\\data1\\train'
 test_path = '..\\data1\\test\\08\\08_data.csv'
@@ -86,15 +87,15 @@ def undersample(data, times=1):
     return undersample_data
 
 
-# # 构造过采样训练集
-# def oversample(data):
-#     data_fail = data[data["label"] == 1]
-#     times = int(len(data) / len(data_fail)) - 1
-#     for i in range(times):
-#         data = data.append(data_fail)
-#     print("过采样正常样本大小：%d" % len(data[data["label"] == 0]))
-#     print("过采样结冰样本大小：%d" % len(data[data["label"] == 1]))
-#     return data
+# 构造过采样训练集
+def oversample1(data):
+    data_fail = data[data["label"] == 1]
+    times = int(len(data) / len(data_fail)) - 1
+    for i in range(times):
+        data = data.append(data_fail)
+    print("过采样正常样本大小：%d" % len(data[data["label"] == 0]))
+    print("过采样结冰样本大小：%d" % len(data[data["label"] == 1]))
+    return data
 
 
 # 过采样，多种可选方式
@@ -139,7 +140,7 @@ def output(y_p):
 
 # 获取评分
 def get_score(y, y_p):
-    cnf = confusion_matrix(y, y_p)
+    cnf = metrics.confusion_matrix(y, y_p)
     p = len(y[y == 0])
     n = len(y[y == 1])
     fn = cnf[0][1]
@@ -148,24 +149,30 @@ def get_score(y, y_p):
     return score
 
 
-def model(clf, X, y):
-    clf.fit(X, y)
-    y_p = clf.predict(X)
-    tools.plot_cm(y, y_p)
-    print(get_score(y, y_p))
-    return y_p
+def modelfit(alg, X_train, y_train, useTrainCV=True, cv_folds=5, early_stopping_rounds=50):
+    if useTrainCV:
+        xgb_param = alg.get_xgb_params()
+        xgtrain = xgb.DMatrix(X_train.values, label=y_train.values)
+        cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=alg.get_params()['n_estimators'], nfold=cv_folds,
+                          metrics='auc', early_stopping_rounds=early_stopping_rounds)
+        alg.set_params(n_estimators=cvresult.shape[0])
 
+    # Fit the algorithm on the data
+    alg.fit(X_train, y_train, eval_metric='auc')
 
-def results(over):
-    X_train, X_test, y_train, y_test = data_prep(over)
-    clf1.fit(X_train, y_train)
-    y_p = clf1.predict(X_train)
-    tools.plot_cm(y_train, y_p)
-    y_p = clf1.predict(X_test)
-    tools.plot_cm(y_test, y_p)
-    y_p = clf1.predict(test)
-    output(y_p)
-    return y_p
+    # Predict training set:
+    dtrain_predictions = alg.predict(X_train)
+    dtrain_predprob = alg.predict_proba(X_train)[:, 1]
+
+    # Print model report:
+    print("\nModel Report")
+    print("Accuracy : %.4g" % metrics.accuracy_score(y_train.values, dtrain_predictions))
+    print("AUC Score (Train): %f" % metrics.roc_auc_score(y_train, dtrain_predprob))
+
+    feat_imp = pd.Series(alg.booster().get_fscore()).sort_values(ascending=False)
+    feat_imp.plot(kind='bar', title='Feature Importances')
+    plt.ylabel('Feature Importance Score')
+
 
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
@@ -247,5 +254,48 @@ if __name__ == '__main__':
 
     clf0 = RandomForestClassifier(random_state=1)
     clf1 = GradientBoostingClassifier(random_state=1)
-    clf2 = xgb.XGBClassifier()
+    clf2 = XGBClassifier()
     clf3 = LogisticRegression()
+
+    # # 训练集训练
+    # X_train, X_test, y_train, y_test = data_prep(over)
+    # clf1.fit(X_train, y_train)
+    # y_p = clf1.predict(X_train)
+    # tools.plot_cm(y_train, y_p)
+    # y_p = clf1.predict(X_test)
+    # tools.plot_cm(y_test, y_p)
+    # y_p = clf1.predict(test)
+    # output(y_p)
+
+    # # 全集训练
+    # # model = SMOTE(random_state=0, n_jobs=-1)
+    # # model = ADASYN(random_state=0, n_jobs=-1)
+    # # model = RandomOverSampler(random_state=0)
+    # over = oversample(data, model)
+    # over = oversample1(data)  # 没有消去时间列
+    #
+    # X = over.iloc[:, :-1]
+    # y = over.label
+    #
+    # clf1.fit(X, y)
+    # y_p = clf1.predict(X)
+    # get_score(y, y_p)
+    # tools.plot_cm(y, y_p)
+    # y_p = clf1.predict(test)
+    # output(y_p)
+
+    over = oversample1(data)
+    X_train, X_test, y_train, y_test = data_prep(over)
+    xgb1 = XGBClassifier(
+        learning_rate=0.1,
+        n_estimators=1000,
+        max_depth=5,
+        min_child_weight=1,
+        gamma=0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective='binary:logistic',
+        nthread=-1,
+        scale_pos_weight=1,
+        seed=27)
+    modelfit(xgb1, X_train, y_train)

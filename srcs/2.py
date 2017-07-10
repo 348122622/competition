@@ -83,9 +83,9 @@ def oversample(data, model):
     X, y = model.fit_sample(data.iloc[:, 1: -1], data["label"])
     X = pd.DataFrame(X, columns=columns)
     y = pd.DataFrame(y, columns=["label"])
-    print("smote采样总样本大小：%d" % len(y))
-    print("smote采样正常样本大小：%d" % len(y[y["label"] == 0]))
-    print("smote采样结冰样本大小：%d" % len(y[y["label"] == 1]))
+    print("过采样总样本大小：%d" % len(y))
+    print("过采样正常样本大小：%d" % len(y[y["label"] == 0]))
+    print("过采样结冰样本大小：%d" % len(y[y["label"] == 1]))
     # 注意，返回的数据集已经去掉了时间列
     return pd.concat([X, y], axis=1)
 
@@ -167,12 +167,30 @@ if __name__ == '__main__':
     clf1 = GradientBoostingClassifier(random_state=1)
     clf2 = xgb.XGBClassifier()
 
-    X_train, X_test, y_train, y_test = data_prep(over)
-    clf1.fit(X_train, y_train)
-    y_p = clf1.predict(X_train)
-    tools.plot_cm(y_train, y_p)
-    y_p = clf1.predict(X_test)
-    tools.plot_cm(y_test, y_p)
+    # 过采样训练集训练
+    # X_train, X_test, y_train, y_test = data_prep(over)
+    # clf1.fit(X_train, y_train)
+    # y_p = clf1.predict(X_train)
+    # tools.plot_cm(y_train, y_p)
+    # y_p = clf1.predict(X_test)
+    # tools.plot_cm(y_test, y_p)
+    # y_p1 = clf1.predict(test26)
+    # y_p2 = clf1.predict(test33)
+    # output(y_p1, 26)
+    # output(y_p2, 33)
+
+    # 过采样全集训练
+    # model = SMOTE(random_state=0, n_jobs=-1)
+    # model = ADASYN(random_state=0, n_jobs=-1)
+    # model = RandomOverSampler(random_state=0)
+    over = oversample(data, model)
+    over = oversample1(data)  # 没有消去时间列
+    X = over.iloc[:, : -1]
+    y = over["label"]
+
+    clf1.fit(X, y)
+    y_p = clf1.predict(X)
+    tools.plot_cm(y, y_p)
     y_p1 = clf1.predict(test26)
     y_p2 = clf1.predict(test33)
     output(y_p1, 26)
