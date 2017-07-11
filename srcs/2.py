@@ -85,7 +85,7 @@ def oversample(data, model):
     y = pd.DataFrame(y, columns=["label"])
     print("过采样总样本大小：%d" % len(y))
     print("过采样正常样本大小：%d" % len(y[y["label"] == 0]))
-    print("过采样结冰样本大小：%d" % len(y[y["label"] == 1]))
+    print("过采样故障样本大小：%d" % len(y[y["label"] == 1]))
     # 注意，返回的数据集已经去掉了时间列
     return pd.concat([X, y], axis=1)
 
@@ -182,16 +182,18 @@ if __name__ == '__main__':
     # 过采样全集训练
     # model = SMOTE(random_state=0, n_jobs=-1)
     # model = ADASYN(random_state=0, n_jobs=-1)
-    # model = RandomOverSampler(random_state=0)
+    model = RandomOverSampler(random_state=0)
     over = oversample(data, model)
-    over = oversample1(data)  # 没有消去时间列
-    X = over.iloc[:, : -1]
+    # over = oversample1(data)  # 没有消去时间列
+    X = over.iloc[:, : -2]
     y = over["label"]
 
-    clf1.fit(X, y)
-    y_p = clf1.predict(X)
-    tools.plot_cm(y, y_p)
-    y_p1 = clf1.predict(test26)
-    y_p2 = clf1.predict(test33)
+    # clf1.fit(X, y)
+    # y_p = clf1.predict(X)
+    # tools.plot_cm(y, y_p)
+    test26 = test26.iloc[:, : -1]
+    test33 = test33.iloc[:, : -1]
+    y_p1 = clf2.predict(test26)
+    y_p2 = clf2.predict(test33)
     output(y_p1, 26)
     output(y_p2, 33)

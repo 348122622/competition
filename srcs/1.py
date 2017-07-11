@@ -13,8 +13,6 @@ from sklearn import metrics, cross_validation
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
-from matplotlib.pylab import rcParams
-rcParams['figure.figsize'] = 12, 4
 
 train_path = '..\\data1\\train'
 test_path = '..\\data1\\test\\08\\08_data.csv'
@@ -107,9 +105,9 @@ def oversample(data, model):
     X, y = model.fit_sample(data.iloc[:, 1: -1], data["label"])
     X = pd.DataFrame(X, columns=columns)
     y = pd.DataFrame(y, columns=["label"])
-    print("smote采样总样本大小：%d" % len(y))
-    print("smote采样正常样本大小：%d" % len(y[y["label"] == 0]))
-    print("smote采样结冰样本大小：%d" % len(y[y["label"] == 1]))
+    print("过采样总样本大小：%d" % len(y))
+    print("过采样正常样本大小：%d" % len(y[y["label"] == 0]))
+    print("过采样结冰样本大小：%d" % len(y[y["label"] == 1]))
     # 注意，返回的数据集已经去掉了时间列
     return pd.concat([X, y], axis=1)
 
@@ -149,59 +147,20 @@ def get_score(y, y_p):
     return score
 
 
-def modelfit(alg, X_train, y_train, useTrainCV=True, cv_folds=5, early_stopping_rounds=50):
-    if useTrainCV:
-        xgb_param = alg.get_xgb_params()
-        xgtrain = xgb.DMatrix(X_train.values, label=y_train.values)
-        cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=alg.get_params()['n_estimators'], nfold=cv_folds,
-                          metrics='auc', early_stopping_rounds=early_stopping_rounds)
-        alg.set_params(n_estimators=cvresult.shape[0])
-
-    # Fit the algorithm on the data
-    alg.fit(X_train, y_train, eval_metric='auc')
-
-    # Predict training set:
-    dtrain_predictions = alg.predict(X_train)
-    dtrain_predprob = alg.predict_proba(X_train)[:, 1]
-
-    # Print model report:
-    print("\nModel Report")
-    print("Accuracy : %.4g" % metrics.accuracy_score(y_train.values, dtrain_predictions))
-    print("AUC Score (Train): %f" % metrics.roc_auc_score(y_train, dtrain_predprob))
-
-    feat_imp = pd.Series(alg.booster().get_fscore()).sort_values(ascending=False)
-    feat_imp.plot(kind='bar', title='Feature Importances')
-    plt.ylabel('Feature Importance Score')
-
-
 if __name__ == '__main__':
     data_15, norm_15, fail_15 = get_data(15)
     data_21, norm_21, fail_21 = get_data(21)
     data15 = add_label(data_15, norm_15, fail_15)
     data21 = add_label(data_21, norm_21, fail_21)
     test = get_test()
+    test = test.iloc[:, :-1]  # del group
     # 查看正负样本数目-->非平衡数据集
     # 15号风机label：
     # 0.0: 350255
     # 1.0: 23892
     # data_15["label"].value_counts(dropna=False)
     # data_21["label"].value_counts(dropna=False)
-    # 热图，相关系数矩阵
-    # corrmat = data15.corr()
-    # f, ax = plt.subplots(figsize=(12, 9))
-    # sns.heatmap(corrmat, vmax=.8, square=True)
-    # plt.xticks(rotation=90)
-    # plt.yticks(rotation=0)
-    #
-    # plt.figure()
-    # k = 10
-    # cols = corrmat.nlargest(k, 'label')['label'].index
-    # cm = np.corrcoef(data15[cols].values.T)
-    # sns.set(font_scale=1.25)
-    # sns.heatmap(cm, cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 10}, yticklabels=cols.values,
-    #             xticklabels=cols.values)
-    # plt.xticks(rotation=90)
-    # plt.yticks(rotation=0)
+
     
     # 1:1欠采样
     # X15, y15 = get_train(data15)
@@ -249,8 +208,27 @@ if __name__ == '__main__':
 
     # 合并15，21数据
     data = pd.concat([data15, data21])
-    X = data.iloc[:, 1: -1]
+    X = data.iloc[:, 1: -2]
     y = data["label"]
+
+    # 热图，相关系数矩阵
+    # corrmat = data15.corr()
+    f, ax = plt.subplots(figsize=(12, 9))
+    # sns.heatmap(corrmat, vmax=.8, square=True)
+    # plt.xticks(rotation=90)
+    # plt.yticks(rotation=0)
+    #
+    # plt.figure()
+    # k = 10
+    # cols = corrmat.nlargest(k, 'label')['label'].index
+    data = pd.concat([data15, data21])
+    data = data.iloc[:, 1:]
+    cm = np.corrcoef(data[data.columns].values.T)
+    sns.set(font_scale=1.25)
+    sns.heatmap(cm, cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 10},
+                yticklabels=data.columns.values,xticklabels=data.columns.values)
+    plt.xticks(rotation=90)
+    plt.yticks(rotation=0)
 
     clf0 = RandomForestClassifier(random_state=1)
     clf1 = GradientBoostingClassifier(random_state=1)
@@ -284,18 +262,29 @@ if __name__ == '__main__':
     # y_p = clf1.predict(test)
     # output(y_p)
 
+
+    # model = SMOTE(random_state=0, n_jobs=-1)
+    # model = ADASYN(random_state=0, n_jobs=-1)
+    # model = RandomOverSampler(random_state=0)
+    # over = oversample(data, model) # 已去掉时间列
     over = oversample1(data)
-    X_train, X_test, y_train, y_test = data_prep(over)
-    xgb1 = XGBClassifier(
-        learning_rate=0.1,
-        n_estimators=1000,
-        max_depth=5,
-        min_child_weight=1,
-        gamma=0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        objective='binary:logistic',
-        nthread=-1,
-        scale_pos_weight=1,
-        seed=27)
-    modelfit(xgb1, X_train, y_train)
+    X_o = over.iloc[:, 1: -2]
+    y_o = over["label"]
+    # X_train, X_test, y_train, y_test = data_prep(over)
+    # clf4 = XGBClassifier(
+    #     max_depth=5,
+    #     subsample=0.8,
+    #     colsample_bytree=0.8,
+    #     seed=10)
+    # param_range = range(40, 81, 10)
+    # param_grid = {'n_estimators': param_range}
+    # gs = GridSearchCV(clf4,
+    #                   param_grid,
+    #                   cv=5,
+    #                   scoring='roc_auc')
+    # param_test1 = {'n_estimators': range(10, 71, 10)}
+    # gs = GridSearchCV(clf0,
+    #                   param_test1,
+    #                   cv=5,
+    #                   scoring='roc_auc')
+    # # modelfit(xgb1, X_train, y_train)
