@@ -196,4 +196,17 @@ if __name__ == '__main__':
     y_p1 = clf2.predict(test26)
     y_p2 = clf2.predict(test33)
     output(y_p1, 26)
-    output(y_p2, 33)
+    output(y_p1, 26)
+
+    predictors = [ 'yaw_position', 'pitch1_angle',
+       'pitch2_angle', 'pitch3_angle', 'pitch1_moto_tmp', 'pitch2_moto_tmp',  'int_tmp', 'pitch1_ng5_tmp',
+       'pitch2_ng5_tmp', 'pitch3_ng5_tmp']
+
+    score = clf2.feature_importances_
+    plt.figure()
+    plt.bar(range(len(predictors)), score)
+    plt.xticks(range(len(predictors)), predictors, rotation='vertical')
+    plt.show()
+
+    y_p1 = clf2.predict(test26[predictors])
+    y_p2 = clf2.predict(test33[predictors])
